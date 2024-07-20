@@ -1,88 +1,70 @@
-# Plantilla de Proyecto de Ciencia de Datos
-
-Esta plantilla está diseñada para impulsar proyectos de ciencia de datos proporcionando una configuración básica para conexiones de base de datos, procesamiento de datos, y desarrollo de modelos de aprendizaje automático. Incluye una organización estructurada de carpetas para tus conjuntos de datos y un conjunto de paquetes de Python predefinidos necesarios para la mayoría de las tareas de ciencia de datos.
-
-## Estructura
-
-El proyecto está organizado de la siguiente manera:
-
-- `app.py` - El script principal de Python que ejecutas para tu proyecto.
-- `explore.py` - Un notebook para que puedas hacer tus exploraciones, idealmente el codigo de este notebook se migra hacia app.py para subir a produccion.
-- `utils.py` - Este archivo contiene código de utilidad para operaciones como conexiones de base de datos.
-- `requirements.txt` - Este archivo contiene la lista de paquetes de Python necesarios.
-- `models/` - Este directorio debería contener tus clases de modelos SQLAlchemy.
-- `data/` - Este directorio contiene los siguientes subdirectorios:
-  - `interim/` - Para datos intermedios que han sido transformados.
-  - `processed/` - Para los datos finales a utilizar para el modelado.
-  - `raw/` - Para datos brutos sin ningún procesamiento.
-
-## Configuración
-
-**Prerrequisitos**
-
-Asegúrate de tener Python 3.11+ instalado en tu máquina. También necesitarás pip para instalar los paquetes de Python.
-
-**Instalación**
-
-Clona el repositorio del proyecto en tu máquina local.
-
-Navega hasta el directorio del proyecto e instala los paquetes de Python requeridos:
-
-```bash
-pip install -r requirements.txt
+https://raw.githubusercontent.com/4GeeksAcademy/k-nearest-neighbors-project-tutorial/main/tmdb_5000_credits.csv
 ```
 
-**Crear una base de datos (si es necesario)**
+#### Paso 1: Carga del conjunto de datos
 
-Crea una nueva base de datos dentro del motor Postgres personalizando y ejecutando el siguiente comando: `$ createdb -h localhost -U <username> <db_name>`
-Conéctate al motor Postgres para usar tu base de datos, manipular tablas y datos: `$ psql -h localhost -U <username> <db_name>`
-NOTA: Recuerda revisar la información del archivo ./.env para obtener el nombre de usuario y db_name.
+Debemos cargar los dos ficheros y almacenarlos en dos estructuras de datos (DataFrames de Pandas) separadas. Por un lado, tendremos almacenada la información de las películas y sus créditos.
 
-¡Una vez que estés dentro de PSQL podrás crear tablas, hacer consultas, insertar, actualizar o eliminar datos y mucho más!
+#### Paso 2: Creación de una base de datos
 
-**Variables de entorno**
+Crea una base de datos para almacenar los dos DataFrames en tablas distintas. A continuación, une las dos tablas con SQL (e intégralo con Python) para generar una tercera tabla que contenga información de ambas unificada. La clave a través de la cual se puede hacer la unión es el título de la película (`titulo`).
 
-Crea un archivo .env en el directorio raíz del proyecto para almacenar tus variables de entorno, como tu cadena de conexión a la base de datos:
+Ahora, limpia la tabla generada y deja solo las siguientes columnas:
 
-```makefile
-DATABASE_URL="your_database_connection_url_here"
-```
+- `movie_id`
+- `title`
+- `overview`
+- `genres`
+- `keywords`
+- `cast`
+- `crew`
 
-## Ejecutando la Aplicación
+#### Paso 3: Transforma los datos
 
-Para ejecutar la aplicación, ejecuta el script app.py desde la raíz del directorio del proyecto:
+Como puedes ver, hay algunas columnas con formato JSON. De cada uno de los JSONs, selecciona el atributo `name` y reemplaza las columnas `genres` y `keywords`. Para la columna `cast`, selecciona los tres primeros nombres.
 
-```bash
-python app.py
-```
+Las únicas columnas que quedan por modificar son `crew` (equipo) y `overview` (resumen). Para la primera columna, transfórmala para que contenga el nombre del director. Para la segunda, conviértela en una lista.
 
-## Añadiendo Modelos
+Una vez hayamos terminado de procesar las columnas y que el modelo de recomendación no se confunda, por ejemplo, entre *Jennifer Aniston* y *Jennifer Conelly*, quitaremos los espacios entre las palabras. Aplica esta función a las columnas `genres`, `cast`, `crew` y `keywords`.
 
-Para añadir clases de modelos SQLAlchemy, crea nuevos archivos de script de Python dentro del directorio models/. Estas clases deben ser definidas de acuerdo a tu esquema de base de datos.
-
-Definición del modelo de ejemplo (`models/example_model.py`):
+Por último, reduciremos nuestro conjunto de datos combinando todas nuestras columnas convertidas anteriores en una sola columna llamada `tags` (que crearemos). Esta columna ahora tendrá todos los elementos separados por comas y luego las reemplazaremos por espacios en blanco. Debería quedar algo así:
 
 ```py
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String
+new_df["tags"][0]
 
-Base = declarative_base()
-
-class ExampleModel(Base):
-    __tablename__ = 'example_table'
-    id = Column(Integer, primary_key=True)
-    name = Column(String)
-
+>>>>"In the 22nd century, a paraplegic Marine is dispatched to the moon Pandora on a unique mission, but becomes torn between following orders and protecting an alien civilization. Action Adventure Fantasy ScienceFiction cultureclash future spacewar spacecolony society spacetravel futuristic romance space alien tribe alienplanet cgi marine soldier battle loveaffair antiwar powerrelations mindandsoul 3d SamWorthington ZoeSaldana SigourneyWeaver JamesCameron"
 ```
 
-## Trabajando con Datos
+#### Paso 4: Construye un KNN
 
-Puedes colocar tus conjuntos de datos brutos en el directorio data/raw, conjuntos de datos intermedios en data/interim, y los conjuntos de datos procesados listos para el análisis en data/processed.
+Para resolver este problema crearemos nosotros nuestro propio KNN. Lo primero de todo es vectorizar el texto siguiendo los mismos pasos que aprendiste en la lección anterior.
 
-Para procesar datos, puedes modificar el script app.py para incluir tus pasos de procesamiento de datos, utilizando pandas para la manipulación y análisis de datos.
+Una vez lo hayas hecho, tendríamos que elegir una distancia para comparar texto. En este módulo hemos visto algunas, y la única compatible con lo que queremos hacer es la `distancia coseno`:
 
-## Contribuyentes
+```py
+from sklearn.metrics.pairwise import cosine_similarity
 
-Esta plantilla fue construida como parte del [Data Science and Machine Learning Bootcamp](https://4geeksacademy.com/us/coding-bootcamps/datascience-machine-learning) de 4Geeks Academy por [Alejandro Sanchez](https://twitter.com/alesanchezr) y muchos otros contribuyentes. Descubre más sobre [los programas BootCamp de 4Geeks Academy](https://4geeksacademy.com/us/programs) aquí.
+similarity = cosine_similarity(vectors)
+```
 
-Otras plantillas y recursos como este se pueden encontrar en la página de GitHub de la escuela.
+Con este código podremos ver la similitud existente entre nuestros vectores (representaciones vectoriales de la columna `tags`).
+
+Finalmente, podemos diseñar nuestra función de similitud basada en la distancia del coseno. Nuestra propuesta es la siguiente:
+
+```py
+def recommend(movie):
+    movie_index = new_df[new_df["title"] == movie].index[0]
+    distances = similarity[movie_index]
+    movie_list = sorted(list(enumerate(distances)), reverse = True , key = lambda x: x[1])[1:6]
+    
+    for i in movie_list:
+        print(new_df.iloc[i[0]].title)
+```
+
+De tal forma que devolveríamos las 5 películas más similares a la que introduzcamos en el título. Podríamos utilizarla como sigue:
+
+```py
+recommend("Introduce una película")
+```
+
+> Nota: También incorporamos muestras de solución en `./solution.ipynb` que te sugerimos honestamente que solo uses si estás atascado por más de 30 minutos o si ya has terminado y quieres compararlo con tu enfoque.
